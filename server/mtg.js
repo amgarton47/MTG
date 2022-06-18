@@ -123,7 +123,10 @@ app.get("/set/:code", (req, res) => {
 //     })
 // })
 
-app.listen(port, () => console.log(`App listening on port ${port}!`))
+app.listen(port, () => {
+    console.log(`App listening on port ${port}!`)
+    storage.clear()
+})
 
 // set.find('SNC')
 // .then(result => {
