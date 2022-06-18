@@ -1,12 +1,11 @@
 const express = require("express")
 const {set, card} = require('mtgsdk')
 const axios = require('axios')
+const {LocalStorage} = require('node-localstorage')
 
 const app = express();
 const port = 3000;
-
-
-
+const storage = new LocalStorage('./scratch')
 
 async function getAllCards(setCode){
     let returnArray = [];
@@ -16,7 +15,6 @@ async function getAllCards(setCode){
             const cards = response.data.cards
             if(cards.length == 0){
                 console.log(returnArray.length)
-                // console.log(returnArray.find(card => card.name == "Titan of Industry"))
                 return returnArray
             }else {
                 returnArray = returnArray.concat(cards);
@@ -38,11 +36,15 @@ async function getAllCards(setCode){
     return unique
 }
 
-app.get("/test", (req, res) => { 
-    getAllCards("2XM").then(cards => {
+app.get("/set/:code", (req, res) => { 
+
+    if(storage.getItem(`${req.params.code}`) != null){
+        console.log("USED STORAGE")
+        let cards = JSON.parse(storage.getItem(`${req.params.code}`))
         const sorted = cards.sort((a, b) => a.name > b.name ? 1 : (a.name < b.name ? -1 : 0))
-        console.log(sorted.map(card => card.name))
-        const images = sorted.reduce((prev, next) => prev +  '<img src= "' + next.imageUrl + `" alt = "${next.name}"/> <b>${next.name}</b>`, "")
+        // console.log(sorted.map(card => card.name))
+
+        const images = cards.reduce((prev, next) => prev +  '<img src= "' + next.imageUrl + `" alt = "${next.name}"/> <b>${next.name}</b>`, "")
         const html = `<!DOCTYPE html> 
             <html> 
             <head> 
@@ -52,8 +54,30 @@ app.get("/test", (req, res) => {
                 ${images}
             </body>
             </html>`;
-    res.send(html)
+        res.send(html)
+    } else {
+
+        console.log("FETCHED DATA")
+    getAllCards(req.params.code).then(cards => {
+
+        const sorted = cards.sort((a, b) => a.name > b.name ? 1 : (a.name < b.name ? -1 : 0))
+        // console.log(sorted.map(card => card.name))
+        storage.setItem(`${req.params.code}`, JSON.stringify(sorted))
+
+        const images = cards.reduce((prev, next) => prev +  '<img src= "' + next.imageUrl + `" alt = "${next.name}"/> <b>${next.name}</b>`, "")
+        const html = `<!DOCTYPE html> 
+            <html> 
+            <head> 
+                <title> MTG </title> 
+            </head> 
+            <body> 
+                ${images}
+            </body>
+            </html>`;
+        res.send(html)
     })
+    }
+
 })
 
 
