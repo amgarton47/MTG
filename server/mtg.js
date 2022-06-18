@@ -1,120 +1,114 @@
-const express = require("express")
-const {set, card} = require('mtgsdk')
-const axios = require('axios')
-const {LocalStorage} = require('node-localstorage')
+const express = require("express");
+// const { set, card } = require("mtgsdk");
+const axios = require("axios");
+const { LocalStorage } = require("node-localstorage");
 
 const app = express();
 const port = 3000;
-const storage = new LocalStorage('./scratch')
+const storage = new LocalStorage("./scratch");
+const MTG_URL = "https://api.magicthegathering.io/v1/";
 
-async function getAllCards(setCode){
-    let returnArray = [];
+const imagify = (cards) => {
+  const images = cards.reduce(
+    (prev, next) =>
+      prev +
+      '<img src= "' +
+      next.imageUrl +
+      `" alt = "${next.name}"/> <b>${next.name}</b>`,
+    ""
+  );
+  return `<!DOCTYPE html>
+                    <html>
+                    <head>
+                        <title> MTG </title>
+                    </head>
+                    <body>
+                        ${images}
+                    </body>
+                    </html>`;
+};
 
-    function recursiveleyFetchCards(count){
-        return axios.get(`https://api.magicthegathering.io/v1/cards?set=${setCode}&page=${count}`).then(async (response) => {
-            const cards = response.data.cards
-            if(cards.length == 0){
-                console.log(returnArray.length)
-                return returnArray
-            }else {
-                returnArray = returnArray.concat(cards);
-                await recursiveleyFetchCards(count+1)
-            }
-        })
-    }
-    await recursiveleyFetchCards(0)
+async function getAllCards(setCode) {
+  let returnArray = [];
 
-    // get unique cards only
-    let unique = []
-    returnArray.forEach(card => {
-        // console.log(c.name, card.name)
-        if(unique.find(c => c.name == card.name) == undefined){
-            unique.push(card)
+  function recursiveleyFetchCards(count) {
+    return axios
+      .get(`${MTG_URL}cards?set=${setCode}&page=${count}`)
+      .then(async (response) => {
+        const cards = response.data.cards;
+        if (cards.length == 0) {
+          console.log(returnArray.length);
+          return returnArray;
+        } else {
+          returnArray = returnArray.concat(cards);
+          await recursiveleyFetchCards(count + 1);
         }
-    })
+      });
+  }
+  await recursiveleyFetchCards(0);
 
-    return unique
+  // get unique cards only
+  let unique = [];
+  returnArray.forEach((card) => {
+    // console.log(c.name, card.name)
+    if (unique.find((c) => c.name == card.name) == undefined) {
+      unique.push(card);
+    }
+  });
+
+  return unique;
 }
 
-app.get("/set/:code", (req, res) => { 
+app.get("/set/:code", async (req, res) => {
+  const setCode = req.params.code;
 
-    if(storage.getItem(`${req.params.code}`) != null){
-        console.log("USED STORAGE")
-        let cards = JSON.parse(storage.getItem(`${req.params.code}`))
-        const sorted = cards.sort((a, b) => a.name > b.name ? 1 : (a.name < b.name ? -1 : 0))
-        // console.log(sorted.map(card => card.name))
+  let cards;
+  if (storage.getItem(`${setCode}`) != null) {
+    console.log("USED STORAGE");
+    cards = JSON.parse(storage.getItem(`${setCode}`));
+  } else {
+    console.log("DID NOT USE STORAGE");
+    cards = await getAllCards(setCode);
 
-        const images = cards.reduce((prev, next) => prev +  '<img src= "' + next.imageUrl + `" alt = "${next.name}"/> <b>${next.name}</b>`, "")
-        const html = `<!DOCTYPE html> 
-            <html> 
-            <head> 
-                <title> MTG </title> 
-            </head> 
-            <body> 
-                ${images}
-            </body>
-            </html>`;
-        res.send(html)
-    } else {
+    const sorted = cards.sort((a, b) =>
+      a.name > b.name ? 1 : a.name < b.name ? -1 : 0
+    );
+    storage.setItem(`${req.params.code}`, JSON.stringify(sorted));
+  }
 
-        console.log("FETCHED DATA")
-    getAllCards(req.params.code).then(cards => {
+  res.send(imagify(cards));
+});
 
-        const sorted = cards.sort((a, b) => a.name > b.name ? 1 : (a.name < b.name ? -1 : 0))
-        // console.log(sorted.map(card => card.name))
-        storage.setItem(`${req.params.code}`, JSON.stringify(sorted))
+app.get("/card/:name", async (req, res) => {
+  const name = req.params.name;
+  const { data } = await axios.get(`${MTG_URL}/cards?name=${name}`);
+  res.send(imagify(data.cards));
+});
 
-        const images = cards.reduce((prev, next) => prev +  '<img src= "' + next.imageUrl + `" alt = "${next.name}"/> <b>${next.name}</b>`, "")
-        const html = `<!DOCTYPE html> 
-            <html> 
-            <head> 
-                <title> MTG </title> 
-            </head> 
-            <body> 
-                ${images}
-            </body>
-            </html>`;
-        res.send(html)
-    })
-    }
+app.get("/booster/:setCode", async (req, res) => {
+  const setCode = req.params.setCode;
+  const { data } = await axios.get(`${MTG_URL}/sets/${setCode}/booster`);
+  res.send(imagify(data.cards));
+});
 
-})
+app.listen(port, () => {
+  console.log(`App listening on port ${port}!`);
+  // storage.clear()
+});
 
-
-// app.get("/test", (req, res)=> {
-
-//     // const cs = []
-//     // card.all({set: 'SNC'}).on('data', (card) => {
-//     //     cs.append(card)
-//     //     console.log(card.name)
-//     // });
-
-//     // let it = 0
-
-//     // function getAllCards(){
-//     //    let cards = []
-//     // }
-
-//     // api request
-//     // if not empty, do again
-
-
-//     // axios.get("https://api.magicthegathering.io/v1/cards?set=SNC&page=2").then(res => console.log(res.data.cards[10].name))
-
-//     // console.log("hi: ", get())
-
+// Examples of using the sdk
 
 //     card.where({set: 'SNC', page: 2}).then(cards => {
 //         // console.log(cards.length)
-        // const sorted = cards.sort((a, b) => a.name > b.name ? 1 : (a.name < b.name ? -1 : 0))
-        // const images = sorted.reduce((prev, next) => prev +  '<img src= "' + next.imageUrl + `" alt = "${next.name}"/>`, "")
+// const sorted = cards.sort((a, b) => a.name > b.name ? 1 : (a.name < b.name ? -1 : 0))
+// const images = sorted.reduce((prev, next) => prev +  '<img src= "' + next.imageUrl + `" alt = "${next.name}"/>`, "")
 
-//         const html = `<!DOCTYPE html> 
-//             <html> 
-//             <head> 
-//                 <title> MTG </title> 
-//             </head> 
-//             <body> 
+//         const html = `<!DOCTYPE html>
+//             <html>
+//             <head>
+//                 <title> MTG </title>
+//             </head>
+//             <body>
 //                 ${images}
 //             </body>
 //             </html>`;
@@ -122,11 +116,6 @@ app.get("/set/:code", (req, res) => {
 //         res.send(html)
 //     })
 // })
-
-app.listen(port, () => {
-    console.log(`App listening on port ${port}!`)
-    storage.clear()
-})
 
 // set.find('SNC')
 // .then(result => {
@@ -137,4 +126,3 @@ app.listen(port, () => {
 //     // const pack = mtg.generateBooster('SNC')
 
 // }).error(err => console.log(err))
-
