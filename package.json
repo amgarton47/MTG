@@ -1,0 +1,12 @@
+{
+  "dependencies": {
+    "axios": "^0.27.2",
+    "express": "^4.18.1",
+    "fetch": "^1.1.0",
+    "mtgsdk": "^1.0.0",
+    "nodemon": "^2.0.16"
+  },
+  "scripts": {
+    "start": "nodemon server/mtg.js"
+  }
+}
