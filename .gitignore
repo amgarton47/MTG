@@ -1,2 +1,3 @@
 /node_modules
-/scratch
+/server/scratch
+/public/bundle.js
